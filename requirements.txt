@@ -4,7 +4,7 @@ ipywidgets==8.0.1
 matplotlib==3.5.3
 pandas==1.5.2
 plotly==5.15.0
-scikit_learn==1.1.2
+
 scipy==1.11.1
 sklearn_relief==1.0.0b2
 streamlit==1.23.1
