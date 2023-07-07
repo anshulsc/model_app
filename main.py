@@ -412,7 +412,7 @@ def plot_lcurve(estimator, X, y):
 
 from sklearn.metrics import roc_curve, auc
 
-def plot_roc(model, X_test, y_test):
+def plot_roc(model, X_test, y_test,fs_method,le):
     y_pred_prob = model.predict_proba(X_test)
     n_classes = len(model.classes_)
     fpr = dict()
@@ -428,7 +428,7 @@ def plot_roc(model, X_test, y_test):
     colors = ['blue', 'red', 'green', 'orange', 'purple']  # You can add more colors for more classes
     for i, color in zip(range(n_classes), colors):
         ax.plot(fpr[i], tpr[i], color=color, lw=2, label='ROC curve for class {} (area = {:.2f})'.format(
-            list(model.classes_)[i], roc_auc[i]))
+            list(model.classes_)[i] if fs_method != "ReliefF" else list(le.classes_)[i], roc_auc[i]))
     ax.plot([0, 1], [0, 1], color='black', lw=2, linestyle='--')
     ax.set_xlim([0.0, 1.0])
     ax.set_ylim([0.0, 1.05])
@@ -440,13 +440,13 @@ def plot_roc(model, X_test, y_test):
     return fig
 
 
-def plot_cm(model, X_test, y_test):
+def plot_cm(model, X_test, y_test, fs_method, le):
     from sklearn import metrics
     import matplotlib.pyplot as plt
     actual = y_test
     predicted = model.predict(X_test)
     confusion_matrix = metrics.confusion_matrix(actual, predicted)
-    cm_display = metrics.ConfusionMatrixDisplay(confusion_matrix=confusion_matrix, display_labels=list(model.classes_))
+    cm_display = metrics.ConfusionMatrixDisplay(confusion_matrix=confusion_matrix, display_labels=list(model.classes_) if fs_method != 'ReliefF' else list(le.classes_))
 
     fig, ax = plt.subplots(figsize=(4, 4))
     ax.grid(False)
@@ -462,7 +462,7 @@ def model_complie(df,model,fs_method,div,analyze, super_label):
      from sklearn.svm import SVC
      from sklearn.linear_model import LogisticRegression
      from sklearn.metrics import accuracy_score, classification_report
-   
+     from sklearn.preprocessing import StandardScaler, LabelEncoder
      
      models = {
       "Logistic Regression" :  LogisticRegression(random_state=0, max_iter=100000),
@@ -524,7 +524,7 @@ def model_complie(df,model,fs_method,div,analyze, super_label):
      st.write(dataframe)
      X_train, X_test, y_train, y_test = train_test_split( X, Y, test_size=0.25, random_state=42)
      from sklearn.feature_selection import SelectKBest, f_classif
-
+     le = LabelEncoder()
      if fs_method == 'F-Score':
          selector = SelectKBest(f_classif, k=5)
          X_train = selector.fit_transform(X_train, y_train)
@@ -563,11 +563,14 @@ def model_complie(df,model,fs_method,div,analyze, super_label):
 
      if fs_method == 'ReliefF':
          from sklearn.preprocessing import StandardScaler, LabelEncoder
+         scaler = StandardScaler()
+         X_std = scaler.fit_transform(X)
          le = LabelEncoder()
          y = le.fit_transform(Y)
+         X_train, X_test, y_train, y_test = train_test_split(X_std,y, test_size = 0.25, random_state = 0)
          import sklearn_relief as sr
          r = sr.RReliefF(n_features = 5)
-         X_train = r.fit_transform(X_train,y_train)
+         X_train = r.fit_transform(X_train ,y_train)
          X_test = r.transform(X_test)
 
      if fs_method == 'Genetic Algorithm':
@@ -592,7 +595,7 @@ def model_complie(df,model,fs_method,div,analyze, super_label):
     
 
      if analyze == "Confusion Matrix":
-        fig = plot_cm(model,X_test, y_test)
+        fig = plot_cm(model,X_test, y_test,fs_method,le)
         with div: 
   
                 buffer = BytesIO()
@@ -615,7 +618,7 @@ def model_complie(df,model,fs_method,div,analyze, super_label):
             st.markdown('</div>', unsafe_allow_html=True)
         
      if analyze == "ROC Curve":
-        fig = plot_roc(model, X_test, y_test)
+        fig = plot_roc(model, X_test, y_test,fs_method, le)
         with div: 
             buffer = BytesIO()
             fig.savefig(buffer, format='png')
@@ -881,7 +884,7 @@ def main():
         if model:
             feature_selection = cont1.checkbox("Feature Selection")
             super_label = cont1.checkbox("Super_label")
-            fs_method = cont2.selectbox("Feature Selection Method",["",'F-Score','MRMR','OMP',"PCA","Genetic Algorithm"] ) if feature_selection else None
+            fs_method = cont2.selectbox("Feature Selection Method",["",'F-Score','ReliefF','OMP',"PCA","Genetic Algorithm"] ) if feature_selection else None
             report = cont2.selectbox("Analyze",["Classification Report", "Confusion Matrix", "Learning Curve", "ROC Curve"])
 
             model_complie(
